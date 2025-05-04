@@ -1,0 +1,125 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: calendar-scaler
+  namespace: myscaler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: calendar-scaler
+  template:
+    metadata:
+      labels:
+        app: calendar-scaler
+    spec:
+      containers:
+      - name: scaler
+        image: calendar-scaler:latest
+        env:
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgresql-password
+        imagePullPolicy: IfNotPresent # test on kind cluster which loads images from local
+        ports:
+        - containerPort: 6000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgresql
+  namespace: myscaler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgresql
+  template:
+    metadata:
+      labels:
+        app: postgresql
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:latest
+        env:
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: postgresql-password
+        - name: PGOPTIONS
+          value: "--log_statement=all --log_min_duration_statement=0" # golang postgresql driver could not log a query.
+        ports:
+        - containerPort: 5432
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: calendar-scaler
+  namespace: myscaler
+spec:
+  ports:
+  - port: 6000
+    targetPort: 6000
+  selector:
+    app: calendar-scaler
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql
+  namespace: myscaler
+spec:
+  ports:
+  - port: 5432
+    targetPort: 5432
+  selector:
+    app: postgresql
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scale-target
+  namespace: myscaler
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: scale-target
+  template:
+    metadata:
+      labels:
+        app: scale-target
+    spec:
+      containers:
+      - name: http
+        image: nginx:latest
+        imagePullPolicy: IfNotPresent
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: scale-target
+  namespace: myscaler
+spec:
+  scaleTargetRef:
+    name: scale-target
+  pollingInterval: 20
+  triggers:
+    - type: external
+      metadata:
+        scalerAddress: calendar-scaler.myscaler.svc.cluster.local:6000
+        type: "postgresql"
+        host: "postgresql.myscaler.svc.cluster.local"
+        port: "5432"
+        database: "calendar"
+        username: "postgres"
+        passwordEnv: "POSTGRES_PASSWORD"
+        table: "events"
+        timezone: "Asia/Tokyo"
+        startColumn: "start_time"
+        endColumn: "end_time"
+        desiredReplicasColumn: "desired_replicas"
