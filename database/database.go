@@ -27,6 +27,12 @@ func NewDatabase(dbType string, metadata *pb.ScaledObjectRef) (Database, error) 
 			return nil, err
 		}
 		return NewPostgresDB(metadata)
+	case "dynamodb":
+		metadata, err := NewDynamoDBMetadata(metadata)
+		if err != nil {
+			return nil, err
+		}
+		return NewDynamoDB(metadata)
 	default:
 		return nil, fmt.Errorf("unsupported database type: %s", dbType)
 	}
