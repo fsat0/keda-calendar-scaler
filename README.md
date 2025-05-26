@@ -10,7 +10,9 @@ Prepare the following information as a record.
 * end: The end time of the scale
 * desiredReplicas: Replicas to scale
 
-### Example
+## Example
+
+### PostgreSQL
 
 Required parameters
 
@@ -43,3 +45,28 @@ triggers:
     endColumn: <end_column>
     desiredReplicasColumn: <desired_replicas_column>
 ```
+
+### DynamoDB
+
+- type: `dynamodb`
+- region: DynamoDBリージョン
+- table: テーブル名
+- startAttribute: スケール開始時刻の属性名
+- endAttribute: スケール終了時刻の属性名
+- desiredReplicasAttribute: レプリカ数の属性名
+- timezone: タイムゾーン名（例: "Asia/Tokyo"）
+
+```yaml
+triggers:
+- type: calendar
+  metadata:
+    type: dynamodb
+    region: <region>
+    table: <table>
+    timezone: <timezone>
+    startAttribute: <start_attribute>
+    endAttribute: <end_attribute>
+    desiredReplicasAttribute: <desired_replicas_attribute>
+```
+
+> Note: startAttribute, endAttribute cannot be set to the reserved keyword of DynamoDB such as `start`, `end`, etc.
