@@ -75,7 +75,7 @@ func NewDynamoDB(meta *DynamoDBMetadata) (*DynamoDBClient, error) {
 		return nil, err
 	}
 
-	// 環境変数DYNAMODB_ENDPOINTがあればエンドポイントを上書き
+	// Override endpoint if DYNAMODB_ENDPOINT environment variable is set
 	endpoint := os.Getenv("DYNAMODB_ENDPOINT")
 	var client *dynamodb.Client
 	if endpoint != "" {
@@ -96,10 +96,10 @@ func (db *DynamoDBClient) GetEvents() ([]Event, error) {
 	now := time.Now().In(location)
 	nowStr := now.Format(time.RFC3339)
 
-	// DynamoDBのScanで期間内のイベントを取得
+	// Retrieve events within the period using DynamoDB Scan
 	filter := fmt.Sprintf("%s <= :now AND %s >= :now", db.Meta.StartTimeAttr, db.Meta.EndTimeAttr)
 	input := &dynamodb.ScanInput{
-		TableName: &db.Meta.TableName,
+		TableName:        &db.Meta.TableName,
 		FilterExpression: &filter,
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":now": &types.AttributeValueMemberS{Value: nowStr},
@@ -150,6 +150,6 @@ func getIntAttr(item map[string]types.AttributeValue, key string) int {
 }
 
 func (db *DynamoDBClient) Close() error {
-	// DynamoDBは明示的なClose不要
+	// No explicit Close required for DynamoDB
 	return nil
 }

@@ -30,8 +30,9 @@ Required parameters
 
 ```yaml
 triggers:
-- type: calendar
+- type: external
   metadata:
+    scalerAddress: calendar-scaler.myscaler.svc.cluster.local:6000
     type: postgresql
     host: <host>
     port: <port>
@@ -49,17 +50,18 @@ triggers:
 ### DynamoDB
 
 - type: `dynamodb`
-- region: DynamoDBリージョン
-- table: テーブル名
-- startAttribute: スケール開始時刻の属性名
-- endAttribute: スケール終了時刻の属性名
-- desiredReplicasAttribute: レプリカ数の属性名
-- timezone: タイムゾーン名（例: "Asia/Tokyo"）
+- region: AWS Region
+- table: Table name of dynamodb.
+- startAttribute: Field name of the start time.
+- endAttribute: Field name of the end time.
+- desiredReplicasAttribute: Field name of desired replicas.
+- timezone: Timezone(ex. Asia/Tokyo)
 
 ```yaml
 triggers:
-- type: calendar
+- type: external
   metadata:
+    scalerAddress: calendar-scaler.myscaler.svc.cluster.local:6000
     type: dynamodb
     region: <region>
     table: <table>
