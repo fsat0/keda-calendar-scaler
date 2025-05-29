@@ -22,6 +22,9 @@ func TestNewPostgreSQLMetadata_RequiredFields(t *testing.T) {
 		},
 	}
 	os.Setenv("PGPASSWORD", "secret")
+	t.Cleanup(func() {
+		os.Unsetenv("PGPASSWORD")
+	})
 	meta, err := NewPostgreSQLMetadata(scaledObject)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
