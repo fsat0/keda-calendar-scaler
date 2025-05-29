@@ -15,8 +15,8 @@ import (
 )
 
 type PostgreSQLMetadata struct {
-	Host     string `validate:"required" default:"localhost"`
-	Port     string `validate:"required" default:"5432"`
+	Host     string `validate:"optional" default:"localhost"`
+	Port     string `validate:"optional" default:"5432"`
 	User     string `validate:"required"`
 	Password string `validate:"required"`
 	Database string `validate:"required"`
