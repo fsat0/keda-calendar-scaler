@@ -10,7 +10,9 @@ Prepare the following information as a record.
 * end: The end time of the scale
 * desiredReplicas: Replicas to scale
 
-### Example
+## Example
+
+### PostgreSQL
 
 Required parameters
 
@@ -28,8 +30,9 @@ Required parameters
 
 ```yaml
 triggers:
-- type: calendar
+- type: external
   metadata:
+    scalerAddress: calendar-scaler.myscaler.svc.cluster.local:6000
     type: postgresql
     host: <host>
     port: <port>
@@ -43,3 +46,29 @@ triggers:
     endColumn: <end_column>
     desiredReplicasColumn: <desired_replicas_column>
 ```
+
+### DynamoDB
+
+- type: `dynamodb`
+- region: AWS Region
+- table: Table name of dynamodb.
+- startAttribute: Field name of the start time.
+- endAttribute: Field name of the end time.
+- desiredReplicasAttribute: Field name of desired replicas.
+- timezone: Timezone(ex. Asia/Tokyo)
+
+```yaml
+triggers:
+- type: external
+  metadata:
+    scalerAddress: calendar-scaler.myscaler.svc.cluster.local:6000
+    type: dynamodb
+    region: <region>
+    table: <table>
+    timezone: <timezone>
+    startAttribute: <start_attribute>
+    endAttribute: <end_attribute>
+    desiredReplicasAttribute: <desired_replicas_attribute>
+```
+
+> Note: startAttribute, endAttribute cannot be set to the reserved keyword of DynamoDB such as `start`, `end`, etc.
