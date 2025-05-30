@@ -19,6 +19,15 @@ type ExternalScaler struct {
 }
 
 func (e *ExternalScaler) IsActive(ctx context.Context, scaledObject *pb.ScaledObjectRef) (*pb.IsActiveResponse, error) {
+	// Determine if we should scale to zero (default: true)
+	if scaleToZeroParam, exists := scaledObject.GetScalerMetadata()["scaleToZeroOnNoEvents"]; exists {
+		if scaleToZeroParam == "false" {
+			// If explicitly set to false, prevent scale to zero by always returning active=true
+			return &pb.IsActiveResponse{Result: true}, nil
+		}
+	}
+
+	// Normal behavior - check for events in database
 	databasetype := scaledObject.GetScalerMetadata()["type"]
 	database, err := db.NewDatabase(databasetype, scaledObject)
 	if err != nil {
