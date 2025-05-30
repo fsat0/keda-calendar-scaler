@@ -1,19 +1,19 @@
 package database
 
 import (
-	"testing"
 	pb "calendar-scaler/externalscaler"
+	"testing"
 )
 
 func TestNewDynamoDBMetadata_RequiredFields(t *testing.T) {
 	scaledObject := &pb.ScaledObjectRef{
 		ScalerMetadata: map[string]string{
-			"table": "calendar_events",
-			"region": "ap-northeast-1",
-			"startAttribute": "startEvent",
-			"endAttribute": "endEvent",
+			"table":                    "calendar_events",
+			"region":                   "ap-northeast-1",
+			"startAttribute":           "startEvent",
+			"endAttribute":             "endEvent",
 			"desiredReplicasAttribute": "desiredReplicas",
-			"timezone": "Asia/Tokyo",
+			"timezone":                 "Asia/Tokyo",
 		},
 	}
 	meta, err := NewDynamoDBMetadata(scaledObject)

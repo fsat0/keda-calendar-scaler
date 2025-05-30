@@ -1,24 +1,24 @@
 package database
 
 import (
+	pb "calendar-scaler/externalscaler"
 	"os"
 	"testing"
-	pb "calendar-scaler/externalscaler"
 )
 
 func TestNewPostgreSQLMetadata_RequiredFields(t *testing.T) {
 	scaledObject := &pb.ScaledObjectRef{
 		ScalerMetadata: map[string]string{
-			"host": "localhost",
-			"port": "5432",
-			"username": "user",
-			"passwordEnv": "PGPASSWORD",
-			"database": "testdb",
-			"table": "events",
-			"timezone": "Asia/Tokyo",
+			"host":                  "localhost",
+			"port":                  "5432",
+			"username":              "user",
+			"passwordEnv":           "PGPASSWORD",
+			"database":              "testdb",
+			"table":                 "events",
+			"timezone":              "Asia/Tokyo",
 			"desiredReplicasColumn": "desired_replicas",
-			"startColumn": "start_time",
-			"endColumn": "end_time",
+			"startColumn":           "start_time",
+			"endColumn":             "end_time",
 		},
 	}
 	os.Setenv("PGPASSWORD", "secret")
@@ -36,13 +36,13 @@ func TestNewPostgreSQLMetadata_RequiredFields(t *testing.T) {
 
 func TestPostgreSQLMetadata_ValidateAndSetDefaults(t *testing.T) {
 	meta := &PostgreSQLMetadata{
-		Host:     "",
-		Port:     "",
-		User:     "user",
-		Password: "pass",
-		Database: "db",
-		Table:    "table",
-		TimeZone: "Asia/Tokyo",
+		Host:                  "",
+		Port:                  "",
+		User:                  "user",
+		Password:              "pass",
+		Database:              "db",
+		Table:                 "table",
+		TimeZone:              "Asia/Tokyo",
 		DesiredReplicasColumn: "desired",
 		StartTimeColumn:       "start",
 		EndTimeColumn:         "end",
