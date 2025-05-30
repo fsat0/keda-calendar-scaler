@@ -27,6 +27,7 @@ Required parameters
 * endColumn: column name of the end time
 * desiredReplicasColumn: column name of the desired replicas
 * timezone: timezone name (e.g., "Asia/Tokyo")
+* scaleToZeroOnNoEvents: (Optional) Controls whether to scale to zero when no events are found. Set to "false" to always keep minimum replicas (default: "true")
 
 ```yaml
 triggers:
@@ -41,21 +42,22 @@ triggers:
     passwordFromEnv: <password>
     table: <table>
     timezone: <timezone>
-
     startColumn: <start_column>
     endColumn: <end_column>
     desiredReplicasColumn: <desired_replicas_column>
+    scaleToZeroOnNoEvents: "false"  # Optional (default: true): set to "false" to prevent scaling to zero
 ```
 
 ### DynamoDB
 
-- type: `dynamodb`
-- region: AWS Region
-- table: Table name of dynamodb.
-- startAttribute: Field name of the start time.
-- endAttribute: Field name of the end time.
-- desiredReplicasAttribute: Field name of desired replicas.
-- timezone: Timezone(ex. Asia/Tokyo)
+* type: `dynamodb`
+* region: AWS Region
+* table: Table name of dynamodb.
+* startAttribute: Field name of the start time.
+* endAttribute: Field name of the end time.
+* desiredReplicasAttribute: Field name of desired replicas.
+* timezone: Timezone(ex. Asia/Tokyo)
+* scaleToZeroOnNoEvents: (Optional) Controls whether to scale to zero when no events are found. Set to "false" to always keep minimum replicas (default: "true")
 
 ```yaml
 triggers:
@@ -69,6 +71,7 @@ triggers:
     startAttribute: <start_attribute>
     endAttribute: <end_attribute>
     desiredReplicasAttribute: <desired_replicas_attribute>
+    scaleToZeroOnNoEvents: "false"  # Optional (default: true): set to "false" to prevent scaling to zero
 ```
 
 > Note: startAttribute, endAttribute cannot be set to the reserved keyword of DynamoDB such as `start`, `end`, etc.
