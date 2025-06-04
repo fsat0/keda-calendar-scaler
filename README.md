@@ -1,33 +1,34 @@
-## What is This?
+# KEDA Calendar External Scaler
 
-This Keda External scaler is a calendar scheduler that scales pods according to calendar events.
+KEDA external scaler for scaling Kubernetes workloads based on calendar events stored in PostgreSQL or DynamoDB.
 
-## How to Use
+## Trigger Specification
 
-Prepare the following information as a record.
+This scaler allows you to scale your workloads according to calendar-based schedules defined in your database. It supports both PostgreSQL and DynamoDB as event sources.
 
-* start: The start time of the scale
-* end: The end time of the scale
-* desiredReplicas: Replicas to scale
+---
 
 ## Example
 
 ### PostgreSQL
 
-Required parameters
+#### PostgreSQL Parameters
 
-* type: "postgresql"
-* host: host name
-* port: port number
-* database: database name
-* user: user name
-* passwordEnv: environment variable name for password
-* table: table name
-* startColumn: column name of the start time
-* endColumn: column name of the end time
-* desiredReplicasColumn: column name of the desired replicas
-* timezone: timezone name (e.g., "Asia/Tokyo")
-* scaleToZeroOnNoEvents: (Optional) Controls whether to scale to zero when no events are found. Set to "false" to always keep minimum replicas (default: "true")
+| Parameter                | Description                                                                                 | Required | Example                |
+|--------------------------|---------------------------------------------------------------------------------------------|----------|------------------------|
+| `type`                   | Database type. Must be `postgresql`                                                         | Yes      | `postgresql`           |
+| `scalerAddress`          | Address of the external scaler service                                                      | Yes      | `calendar-scaler.myscaler.svc.cluster.local:6000` |
+| `host`                   | PostgreSQL host                                                                            | Yes      | `postgres`             |
+| `port`                   | PostgreSQL port                                                                            | Yes      | `5432`                 |
+| `database`               | PostgreSQL database name                                                                    | Yes      | `calendar`             |
+| `user`                   | PostgreSQL user                                                                             | Yes      | `postgres`             |
+| `passwordEnv`            | Name of the environment variable for PostgreSQL password                                    | Yes      | `POSTGRES_PASSWORD`    |
+| `table`                  | Table name                                                                                  | Yes      | `calendar_events`      |
+| `startColumn`            | Column name of the start time                                                               | Yes      | `startEvent`           |
+| `endColumn`              | Column name of the end time                                                                 | Yes      | `endEvent`             |
+| `desiredReplicasColumn`  | Column name of the desired replicas                                                         | Yes      | `desiredReplicas`      |
+| `timezone`               | Timezone name (e.g., `Asia/Tokyo`)                                                         | Yes      | `Asia/Tokyo`           |
+| `scaleToZeroOnNoEvents`  | (Optional) Controls whether to scale to zero when no events are found. Set to `false` to always keep minimum replicas (default: `true`) | No | `false` |
 
 ```yaml
 triggers:
@@ -50,14 +51,19 @@ triggers:
 
 ### DynamoDB
 
-* type: `dynamodb`
-* region: AWS Region
-* table: Table name of dynamodb.
-* startAttribute: Field name of the start time.
-* endAttribute: Field name of the end time.
-* desiredReplicasAttribute: Field name of desired replicas.
-* timezone: Timezone(ex. Asia/Tokyo)
-* scaleToZeroOnNoEvents: (Optional) Controls whether to scale to zero when no events are found. Set to "false" to always keep minimum replicas (default: "true")
+#### DynamoDB Parameters
+
+| Parameter                   | Description                                                                                 | Required | Example                |
+|-----------------------------|---------------------------------------------------------------------------------------------|----------|------------------------|
+| `type`                      | Database type. Must be `dynamodb`                                                           | Yes      | `dynamodb`             |
+| `scalerAddress`             | Address of the external scaler service                                                      | Yes      | `calendar-scaler.myscaler.svc.cluster.local:6000` |
+| `region`                    | AWS Region                                                                                  | Yes      | `ap-northeast-1`       |
+| `table`                     | Table name of DynamoDB                                                                     | Yes      | `calendar_events`      |
+| `startAttribute`            | Field name of the start time                                                                | Yes      | `startEvent`           |
+| `endAttribute`              | Field name of the end time                                                                  | Yes      | `endEvent`             |
+| `desiredReplicasAttribute`  | Field name of desired replicas                                                              | Yes      | `desiredReplicas`      |
+| `timezone`                  | Timezone (e.g., `Asia/Tokyo`)                                                               | Yes      | `Asia/Tokyo`           |
+| `scaleToZeroOnNoEvents`     | (Optional) Controls whether to scale to zero when no events are found. Set to `false` to always keep minimum replicas (default: `true`) | No | `false` |
 
 ```yaml
 triggers:
@@ -75,3 +81,16 @@ triggers:
 ```
 
 > Note: startAttribute, endAttribute cannot be set to the reserved keyword of DynamoDB such as `start`, `end`, etc.
+
+---
+
+## Authentication Parameters
+
+- **PostgreSQL:** Use the `passwordEnv` parameter to specify the environment variable containing the database password.
+- **DynamoDB:** Use AWS credentials via environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`).
+
+## Usage
+
+1. Deploy the external scaler and your database (PostgreSQL or DynamoDB).
+2. Configure your KEDA `ScaledObject` to use the external scaler trigger with the appropriate metadata.
+3. Ensure your event table/attributes are populated with calendar events.
