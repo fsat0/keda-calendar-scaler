@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -26,6 +27,10 @@ type PostgreSQLMetadata struct {
 	DesiredReplicasColumn string `validate:"required"`
 	StartTimeColumn       string `validate:"required"`
 	EndTimeColumn         string `validate:"required"`
+	TargetColumn          string `validate:"optional"`
+
+	Namespace    string `validate:"optional"`
+	ScaledObject string `validate:"optional"`
 }
 
 func NewPostgreSQLMetadata(scaledObject *pb.ScaledObjectRef) (*PostgreSQLMetadata, error) {
@@ -40,6 +45,9 @@ func NewPostgreSQLMetadata(scaledObject *pb.ScaledObjectRef) (*PostgreSQLMetadat
 		DesiredReplicasColumn: scaledObject.GetScalerMetadata()["desiredReplicasColumn"],
 		StartTimeColumn:       scaledObject.GetScalerMetadata()["startColumn"],
 		EndTimeColumn:         scaledObject.GetScalerMetadata()["endColumn"],
+		TargetColumn:          scaledObject.GetScalerMetadata()["targetColumn"],
+		Namespace:             scaledObject.GetNamespace(),
+		ScaledObject:          scaledObject.GetName(),
 	}
 	if err := scalerMetadata.ValidateAndSetDefaults(scalerMetadata); err != nil {
 		return nil, err
@@ -66,7 +74,6 @@ func (*PostgreSQLMetadata) ValidateAndSetDefaults(metadata interface{}) error {
 			}
 		}
 	}
-
 	return nil
 }
 
@@ -98,32 +105,103 @@ func NewPostgresDB(metadata *PostgreSQLMetadata) (*PostgresDB, error) {
 }
 
 func (db *PostgresDB) GetEvents() ([]Event, error) {
+	if db.Meta.TargetColumn == "" {
+		return db.getEventsNoTargetColumn()
+	} else {
+		return db.getEventsWithTargetColumn()
+	}
+}
+
+func (db *PostgresDB) getEventsNoTargetColumn() ([]Event, error) {
 	location, err := time.LoadLocation(db.Meta.TimeZone)
 	if err != nil {
+		fmt.Printf("[PostgreSQL Error] failed to load timezone '%s': %v\n", db.Meta.TimeZone, err)
 		return nil, err
 	}
 	now := time.Now().In(location)
-
 	query := fmt.Sprintf(
 		"SELECT %s, %s, %s FROM %s WHERE %s <= $1 AND $1 <= %s",
 		db.Meta.StartTimeColumn, db.Meta.EndTimeColumn, db.Meta.DesiredReplicasColumn,
 		db.Meta.Table,
 		db.Meta.StartTimeColumn, db.Meta.EndTimeColumn,
 	)
-	rows, err := db.Conn.Query(query, now)
+	args := []interface{}{now}
+	rows, err := db.Conn.Query(query, args...)
 	if err != nil {
+		fmt.Printf("[PostgreSQL Error] failed to execute query: %v\n", err)
 		return nil, err
 	}
 	defer rows.Close()
 	var events []Event
 	for rows.Next() {
-		var event Event
-		if err := rows.Scan(&event.StartTime, &event.EndTime, &event.DesiredReplicas); err != nil {
+		var start time.Time
+		var end time.Time
+		var desiredReplicas int
+		if err := rows.Scan(&start, &end, &desiredReplicas); err != nil {
 			return nil, err
 		}
-		events = append(events, event)
+		events = append(events, Event{
+			StartTime:       start,
+			EndTime:         end,
+			DesiredReplicas: desiredReplicas,
+		})
 	}
 	if err := rows.Err(); err != nil {
+		fmt.Printf("[PostgreSQL Error] error loading events: %v\n", err)
+		return nil, err
+	}
+	return events, nil
+}
+
+func (db *PostgresDB) getEventsWithTargetColumn() ([]Event, error) {
+	location, err := time.LoadLocation(db.Meta.TimeZone)
+	if err != nil {
+		fmt.Printf("[PostgreSQL Error] failed to load timezone '%s': %v\n", db.Meta.TimeZone, err)
+		return nil, err
+	}
+	now := time.Now().In(location)
+	query := fmt.Sprintf(
+		"SELECT %s, %s, %s, %s FROM %s WHERE %s <= $1 AND $1 <= %s",
+		db.Meta.StartTimeColumn, db.Meta.EndTimeColumn, db.Meta.DesiredReplicasColumn, db.Meta.TargetColumn,
+		db.Meta.Table,
+		db.Meta.StartTimeColumn, db.Meta.EndTimeColumn,
+	)
+	args := []interface{}{now}
+	rows, err := db.Conn.Query(query, args...)
+	if err != nil {
+		fmt.Printf("[PostgreSQL Error] failed to execute query: %v\n", err)
+		return nil, err
+	}
+	defer rows.Close()
+	var events []Event
+	targetKey := db.Meta.Namespace + "/" + db.Meta.ScaledObject
+	for rows.Next() {
+		var start time.Time
+		var end time.Time
+		var desiredReplicas int
+		var targets string
+		if err := rows.Scan(&start, &end, &desiredReplicas, &targets); err != nil {
+			fmt.Printf("[PostgreSQL Error] failed to scan row: %v\n", err)
+			return nil, err
+		}
+		found := false
+		for _, t := range strings.Split(targets, ",") {
+			if strings.TrimSpace(t) == targetKey {
+				found = true
+				break
+			}
+		}
+		if !found {
+			continue
+		}
+		events = append(events, Event{
+			StartTime:       start,
+			EndTime:         end,
+			DesiredReplicas: desiredReplicas,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		fmt.Printf("[PostgreSQL Error] error loading events: %v\n", err)
 		return nil, err
 	}
 	return events, nil
