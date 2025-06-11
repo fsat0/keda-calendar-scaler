@@ -22,7 +22,7 @@ spec:
             secretKeyRef:
               name: postgresql-secret
               key: postgresql-password
-        imagePullPolicy: IfNotPresent # test on kind cluster which loads images from local
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 6000
 ---
@@ -51,7 +51,7 @@ spec:
               name: postgresql-secret
               key: postgresql-password
         - name: PGOPTIONS
-          value: "--log_statement=all --log_min_duration_statement=0" # golang postgresql driver could not log a query.
+          value: "--log_statement=all --log_min_duration_statement=0"
         ports:
         - containerPort: 5432
 ---
@@ -98,28 +98,3 @@ spec:
       - name: http
         image: nginx:latest
         imagePullPolicy: IfNotPresent
----
-apiVersion: keda.sh/v1alpha1
-kind: ScaledObject
-metadata:
-  name: scale-target
-  namespace: myscaler
-spec:
-  scaleTargetRef:
-    name: scale-target
-  pollingInterval: 20
-  triggers:
-    - type: external
-      metadata:
-        scalerAddress: calendar-scaler.myscaler.svc.cluster.local:6000
-        type: "postgresql"
-        host: "postgresql.myscaler.svc.cluster.local"
-        port: "5432"
-        database: "calendar"
-        username: "postgres"
-        passwordEnv: "POSTGRES_PASSWORD"
-        table: "events"
-        timezone: "Asia/Tokyo"
-        startColumn: "start_time"
-        endColumn: "end_time"
-        desiredReplicasColumn: "desired_replicas"

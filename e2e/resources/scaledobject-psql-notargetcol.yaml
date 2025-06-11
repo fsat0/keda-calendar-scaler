@@ -1,0 +1,35 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: scale-target-notargetcol
+  namespace: myscaler
+spec:
+  scaleTargetRef:
+    name: scale-target
+  pollingInterval: 20
+  cooldownPeriod: 10
+  triggers:
+    - type: external
+      metadata:
+        scalerAddress: calendar-scaler.myscaler.svc.cluster.local:6000
+        type: "postgresql"
+        host: "postgresql.myscaler.svc.cluster.local"
+        port: "5432"
+        database: "calendar"
+        username: "postgres"
+        passwordEnv: "POSTGRES_PASSWORD"
+        table: "calendar_events"
+        timezone: "Asia/Tokyo"
+        startColumn: "startEvent"
+        endColumn: "endEvent"
+        desiredReplicasColumn: "desiredReplicas"
+        scaleToZeroOnNoEvents: "true"
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 20
+          policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 10

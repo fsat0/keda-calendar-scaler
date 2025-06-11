@@ -1,0 +1,30 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: scale-target-dynamodb-notargetattr
+  namespace: myscaler
+spec:
+  scaleTargetRef:
+    name: scale-target
+  pollingInterval: 20
+  triggers:
+  - type: external
+    metadata:
+      scalerAddress: calendar-scaler.myscaler.svc.cluster.local:6000
+      type: dynamodb
+      region: ap-northeast-1
+      table: calendar_events
+      timezone: Asia/Tokyo
+      startAttribute: startEvent
+      endAttribute: endEvent
+      desiredReplicasAttribute: desiredReplicas
+      # targetAttribute is omitted
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 20
+          policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 10
