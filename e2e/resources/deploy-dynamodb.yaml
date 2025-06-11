@@ -92,24 +92,3 @@ spec:
       - name: http
         image: nginx:latest
         imagePullPolicy: IfNotPresent
----
-apiVersion: keda.sh/v1alpha1
-kind: ScaledObject
-metadata:
-  name: scale-target
-  namespace: myscaler
-spec:
-  scaleTargetRef:
-    name: scale-target
-  pollingInterval: 20
-  triggers:
-  - type: external
-    metadata:
-      scalerAddress: calendar-scaler.myscaler.svc.cluster.local:6000
-      type: dynamodb
-      region: ap-northeast-1
-      table: calendar_events
-      timezone: Asia/Tokyo
-      startAttribute: startEvent
-      endAttribute: endEvent
-      desiredReplicasAttribute: desiredReplicas

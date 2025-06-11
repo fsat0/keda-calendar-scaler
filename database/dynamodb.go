@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -21,7 +22,10 @@ type DynamoDBMetadata struct {
 	StartTimeAttr       string
 	EndTimeAttr         string
 	DesiredReplicasAttr string
+	TargetAttr          string
 	TimeZone            string
+	Namespace           string
+	ScaledObject        string
 }
 
 func NewDynamoDBMetadata(scaledObject *pb.ScaledObjectRef) (*DynamoDBMetadata, error) {
@@ -31,7 +35,10 @@ func NewDynamoDBMetadata(scaledObject *pb.ScaledObjectRef) (*DynamoDBMetadata, e
 		StartTimeAttr:       scaledObject.GetScalerMetadata()["startAttribute"],
 		EndTimeAttr:         scaledObject.GetScalerMetadata()["endAttribute"],
 		DesiredReplicasAttr: scaledObject.GetScalerMetadata()["desiredReplicasAttribute"],
+		TargetAttr:          scaledObject.GetScalerMetadata()["targetAttribute"],
 		TimeZone:            scaledObject.GetScalerMetadata()["timezone"],
+		Namespace:           scaledObject.GetNamespace(),
+		ScaledObject:        scaledObject.GetName(),
 	}
 	if err := meta.validate(); err != nil {
 		return nil, err
@@ -89,24 +96,35 @@ func NewDynamoDB(meta *DynamoDBMetadata) (*DynamoDBClient, error) {
 }
 
 func (db *DynamoDBClient) GetEvents() ([]Event, error) {
+	if strings.TrimSpace(db.Meta.TargetAttr) == "" {
+		return db.getEventsWithoutTargetAttr()
+	} else {
+		return db.getEventsWithTargetAttr()
+	}
+}
+
+func (db *DynamoDBClient) getEventsWithoutTargetAttr() ([]Event, error) {
 	location, err := time.LoadLocation(db.Meta.TimeZone)
 	if err != nil {
+		fmt.Printf("[DynamoDB Error] failed to load timezone '%s': %v\n", db.Meta.TimeZone, err)
 		return nil, err
 	}
 	now := time.Now().In(location)
 	nowStr := now.Format(time.RFC3339)
-
-	// Retrieve events within the period using DynamoDB Scan
 	filter := fmt.Sprintf("%s <= :now AND %s >= :now", db.Meta.StartTimeAttr, db.Meta.EndTimeAttr)
-	input := &dynamodb.ScanInput{
-		TableName:        &db.Meta.TableName,
-		FilterExpression: &filter,
-		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":now": &types.AttributeValueMemberS{Value: nowStr},
-		},
+	exprAttrValues := map[string]types.AttributeValue{
+		":now": &types.AttributeValueMemberS{Value: nowStr},
 	}
-	result, err := db.Client.Scan(context.TODO(), input)
+	input := &dynamodb.ScanInput{
+		TableName:                 &db.Meta.TableName,
+		FilterExpression:          &filter,
+		ExpressionAttributeValues: exprAttrValues,
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	result, err := db.Client.Scan(ctx, input)
 	if err != nil {
+		fmt.Printf("[DynamoDB Error] failed to scan table '%s': %v\n", db.Meta.TableName, err)
 		return nil, err
 	}
 	var events []Event
@@ -114,9 +132,74 @@ func (db *DynamoDBClient) GetEvents() ([]Event, error) {
 		startStr := getStringAttr(item, db.Meta.StartTimeAttr)
 		endStr := getStringAttr(item, db.Meta.EndTimeAttr)
 		desiredReplicas := getIntAttr(item, db.Meta.DesiredReplicasAttr)
-		start, err1 := time.Parse(time.RFC3339, startStr)
-		end, err2 := time.Parse(time.RFC3339, endStr)
-		if err1 != nil || err2 != nil {
+		start, err := time.Parse(time.RFC3339, startStr)
+		if err != nil {
+			fmt.Printf("[DynamoDB Parse Error] failed to parse startStr '%s': %v\n", startStr, err)
+			continue
+		}
+		end, err := time.Parse(time.RFC3339, endStr)
+		if err != nil {
+			fmt.Printf("[DynamoDB Parse Error] failed to parse endStr '%s': %v\n", endStr, err)
+			continue
+		}
+		events = append(events, Event{
+			StartTime:       start,
+			EndTime:         end,
+			DesiredReplicas: desiredReplicas,
+		})
+	}
+	return events, nil
+}
+
+func (db *DynamoDBClient) getEventsWithTargetAttr() ([]Event, error) {
+	location, err := time.LoadLocation(db.Meta.TimeZone)
+	if err != nil {
+		fmt.Printf("[DynamoDB Error] failed to load timezone '%s': %v\n", db.Meta.TimeZone, err)
+		return nil, err
+	}
+	now := time.Now().In(location)
+	nowStr := now.Format(time.RFC3339)
+	filter := fmt.Sprintf("%s <= :now AND %s >= :now", db.Meta.StartTimeAttr, db.Meta.EndTimeAttr)
+	exprAttrValues := map[string]types.AttributeValue{
+		":now": &types.AttributeValueMemberS{Value: nowStr},
+	}
+	input := &dynamodb.ScanInput{
+		TableName:                 &db.Meta.TableName,
+		FilterExpression:          &filter,
+		ExpressionAttributeValues: exprAttrValues,
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	result, err := db.Client.Scan(ctx, input)
+	if err != nil {
+		fmt.Printf("[DynamoDB Error] failed to scan table '%s': %v\n", db.Meta.TableName, err)
+		return nil, err
+	}
+	var events []Event
+	targetKey := db.Meta.Namespace + "/" + db.Meta.ScaledObject
+	for _, item := range result.Items {
+		startStr := getStringAttr(item, db.Meta.StartTimeAttr)
+		endStr := getStringAttr(item, db.Meta.EndTimeAttr)
+		desiredReplicas := getIntAttr(item, db.Meta.DesiredReplicasAttr)
+		targets := getStringAttr(item, db.Meta.TargetAttr)
+		addEvent := false
+		for _, t := range strings.Split(targets, ",") {
+			if strings.TrimSpace(t) == targetKey {
+				addEvent = true
+				break
+			}
+		}
+		if !addEvent {
+			continue
+		}
+		start, err := time.Parse(time.RFC3339, startStr)
+		if err != nil {
+			fmt.Printf("[DynamoDB Parse Error] failed to parse startStr '%s': %v\n", startStr, err)
+			continue
+		}
+		end, err := time.Parse(time.RFC3339, endStr)
+		if err != nil {
+			fmt.Printf("[DynamoDB Parse Error] failed to parse endStr '%s': %v\n", endStr, err)
 			continue
 		}
 		events = append(events, Event{
