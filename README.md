@@ -29,7 +29,7 @@ This scaler allows you to scale your workloads according to calendar-based sched
 | `desiredReplicasColumn`  | Column name of the desired replicas                                                         | Yes      | `desiredReplicas`      |
 | `timezone`               | Timezone name (e.g., `Asia/Tokyo`)                                                         | Yes      | `Asia/Tokyo`           |
 | `scaleToZeroOnNoEvents`  | (Optional) Controls whether to scale to zero when no events are found. Set to `false` to always keep minimum replicas (default: `true`) | No | `false` |
-| `targetColumn`           | (Optional) Column name that contains a comma-separated list of scaledobject identifiers (e.g., `namespace/scaledobject_name`). This column determines which events apply to which ScaledObject. | No       | `target`               |
+| `targetColumn`           | (Optional) Column name of filter conditions. This field specifies the column used to determine which ScaledObjects each event applies to. The filter condition value is a comma-separated list of `namespace/scaledobject_name` strings. Only events where the current ScaledObject is included in this list will be considered for scaling. | No       | `target`               |
 
 ```yaml
 triggers:
@@ -51,9 +51,17 @@ triggers:
     targetColumn: <target_column> # Optional (default: ""): Column name specifying the list of scaledobject names
 ```
 
-> Note: The field specified in `targetColumn` is optional. If omitted, all events are considered. If specified, the column must contain a comma-separated list of scaledobject identifiers in the format `namespace/scaledobject_name` (e.g., `default/scaledobject1,default/scaledobject2`).
+> Note: The field specified in `targetColumn` is optional. If omitted, all events are considered. If specified, the filter condition value in the specified column must be a comma-separated list of `namespace/scaledobject_name` strings. Only events where the current ScaledObject is included in this list will be used for scaling.
 
 > Note: The value of `startColumn` and `endColumn` must be in RFC3339 format (e.g., `2024-06-11T12:00:00+09:00`).
+
+### Example: PostgreSQL Event Table Row
+
+| startEvent              | endEvent                | desiredReplicas | target                |
+|-------------------------|-------------------------|-----------------|-----------------------|
+| 2025-06-16T09:00:00+09:00 | 2025-06-16T18:00:00+09:00 | 3               | default/myapp,default/anotherapp |
+
+- In this example, the `target` column contains a comma-separated list of ScaledObject identifiers. This event applies to both `default/myapp` and `default/anotherapp`.
 
 ### DynamoDB
 
@@ -70,7 +78,7 @@ triggers:
 | `desiredReplicasAttribute`  | Field name of desired replicas                                                              | Yes      | `desiredReplicas`      |
 | `timezone`                  | Timezone (e.g., `Asia/Tokyo`)                                                               | Yes      | `Asia/Tokyo`           |
 | `scaleToZeroOnNoEvents`     | (Optional) Controls whether to scale to zero when no events are found. Set to `false` to always keep minimum replicas (default: `true`) | No | `false` |
-| `targetAttribute`           | (Optional) Attribute name that contains a comma-separated list of scaledobject identifiers (e.g., `namespace/scaledobject_name`). This attribute determines which events apply to which ScaledObject. | No       | `workload`             |
+| `targetAttribute`           | (Optional) Field name of filter conditions. This field specifies the attribute used to determine which ScaledObjects each event applies to. The filter condition value is a comma-separated list of `namespace/scaledobject_name` strings. Only events where the current ScaledObject is included in this list will be considered for scaling. | No       | `workload`             |
 
 ```yaml
 triggers:
@@ -88,13 +96,25 @@ triggers:
     targetAttribute: <target_attribute> # Optional (default: ""): Field name specifying the list of scaledobject names
 ```
 
-> Note: `startAttribute` and `endAttribute` cannot be set to DynamoDB reserved keywords such as `start`, `end`, etc.
+> Note: `startAttribute` and `endAttribute` cannot be set to DynamoDB reserved keywords such as `start`, `end`, etc`.
 
-> Note: The field specified in `targetAttribute` is optional. If omitted, all events are considered. If specified, the attribute must contain a comma-separated list of scaledobject identifiers in the format `namespace/scaledobject_name` (e.g., `default/scaledobject1,default/scaledobject2`).
+> Note: The field specified in `targetAttribute` is optional. If omitted, all events are considered. If specified, the filter condition value in the specified attribute must be a comma-separated list of `namespace/scaledobject_name` strings. Only events where the current ScaledObject is included in this list will be used for scaling.
 
 > Note: The value of `startAttribute` and `endAttribute` must be in RFC3339 format (e.g., `2024-06-11T12:00:00+09:00`).
 
 > Note: You can override the DynamoDB endpoint for local/testing by setting the `DYNAMODB_ENDPOINT` environment variable.
+
+### Example: DynamoDB Event Item
+
+```json
+{
+  "startEvent": "2025-06-16T09:00:00+09:00",
+  "endEvent": "2025-06-16T18:00:00+09:00",
+  "desiredReplicas": 3,
+  "workload": "default/myapp,default/anotherapp"
+}
+```
+- In this example, the `workload` attribute contains a comma-separated list of ScaledObject identifiers. This event applies to both `default/myapp` and `default/anotherapp`.
 
 ---
 
